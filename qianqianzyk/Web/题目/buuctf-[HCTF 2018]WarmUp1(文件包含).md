@@ -1,0 +1,110 @@
+```php
+<?php
+    highlight_file(__FILE__);
+    class emmm
+    {
+        public static function checkFile(&$page)
+        {
+            $whitelist = ["source"=>"source.php","hint"=>"hint.php"];
+            if (! isset($page) || !is_string($page)) {
+                echo "you can't see it";
+                return false;
+            }
+
+            if (in_array($page, $whitelist)) {
+                return true;
+            }
+
+            $_page = mb_substr(
+                $page,
+                0,
+                mb_strpos($page . '?', '?')
+            );
+            if (in_array($_page, $whitelist)) {
+                return true;
+            }
+
+            $_page = urldecode($page);
+            $_page = mb_substr(
+                $_page,
+                0,
+                mb_strpos($_page . '?', '?')
+            );
+            if (in_array($_page, $whitelist)) {
+                return true;
+            }
+            echo "you can't see it";
+            return false;
+        }
+    }
+
+    if (! empty($_REQUEST['file'])
+        && is_string($_REQUEST['file'])
+        && emmm::checkFile($_REQUEST['file'])
+    ) {
+        include $_REQUEST['file'];
+        exit;
+    } else {
+        echo "<br><img src=\"https://i.loli.net/2018/11/01/5bdb0d93dc794.jpg\" />";
+    }  
+?>
+```
+
+从代码中发现新的页面hint访问获得flag文件名**ffffllllaaaagggg**
+
+总的来说这个checkFile这个函数进行了 3次白名单检测、 2次问好过滤、一次URL解码
+
+```php
+class emmm
+ 2     {
+ 3         public static function checkFile(&$page)
+ 4 
+ 5         {
+ 6             //白名单列表
+ 7             $whitelist = ["source"=>"source.php","hint"=>"hint.php"];
+ 8             //isset()判断变量是否声明is_string()判断变量是否是字符串 &&用了逻辑与两个值都为真才执行if里面的值
+ 9             if (! isset($page) || !is_string($page)) {
+10                 echo "you can't see it A";
+11                 return false;
+12             }
+13             //检测传进来的值是否匹配白名单列表$whitelist 如果有则执行真
+14             if (in_array($page, $whitelist)) {
+15                 return true;
+16             }
+17             //过滤问号的函数(如果$page的值有？则从?之前提取字符串)
+18             $_page = mb_substr(
+19                 $page,
+20                 0,
+21                 mb_strpos($page . '?', '?')//返回$page.?里卖弄?号出现的第一个位置
+22             );
+23 
+24              //第二次检测传进来的值是否匹配白名单列表$whitelist 如果有则执行真
+25             if (in_array($_page, $whitelist)) {
+26                 return true;
+27             }
+28             //url对$page解码
+29             $_page = urldecode($page);
+30 
+31             //第二次过滤问号的函数(如果$page的值有？则从?之前提取字符串)
+32             $_page = mb_substr(
+33                 $_page,
+34                 0,
+35                 mb_strpos($_page . '?', '?')
+36             );
+37             //第三次检测传进来的值是否匹配白名单列表$whitelist 如果有则执行真
+38             if (in_array($_page, $whitelist)) {
+39                 return true;
+40             }
+41             echo "you can't see it";
+42             return false;
+43         }
+44     }
+```
+
+现在构造获取flag的语句
+
+hint.php?../../../../../ffffllllaaaagggg 我们可以想象他传入checkFile函数要经历 第一次白名单验证 一次？过滤后他就是hint.php 再进行一次白名单验证 返回为真 则达成条件进行包含得到flag
+
+tips:include函数有这么一个神奇的功能：以字符‘/’分隔（而且不计个数），若是在前面的字符串所代表的文件无法被PHP找到，则PHP会自动包含‘/’后面的文件——注意是最后一个‘/’。
+
+这里的ffffllllaaaagggg是在hint.php中发现的，显然flag在这个文件里。其实文件名提示了我们要使用四层目录。

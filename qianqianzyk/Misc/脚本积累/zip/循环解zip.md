@@ -41,3 +41,122 @@ while (1):
 
 # rust和john破解多层zip
 
+```txt
+cargo new solve
+```
+
+这是 Rust 语言的包管理器 Cargo 创建一个新的 Rust 项目，名为 solve
+
+## john
+
+```txt
+./configure --enable-rexgen
+```
+
+这是在编译一个名为 john 的程序时使用的命令。configure 脚本通常用于配置软件包的安装过程。在这里，通过 --enable-rexgen 选项，启用了正则表达式的支持
+进入 John 程序的源代码目录，然后执行以下命令来编译 John 程序，并启用正则表达式支持
+
+## crack.sh
+
+crack.sh：这是一个 Bash 脚本，用于调用 John 程序进行密码破解。它的主要作用是从一个名为 archive.zip 的压缩文件中提取哈希信息，然后使用 John 程序进行密码破解。如果找到了密码，则输出密码；如果未找到密码，则尝试使用 john --show 命令来显示所有密码，然后使用 grep 过滤出其中的密码信息。
+
+```txt
+#/bin/bash
+zip2john archive.zip > zip.hashs 2>/dev/null &&
+result=$(john --regex="$1" zip.hashs 2>/dev/null | grep "flag.txt" | awk '{print $1}')
+if [[ -z $result ]]; then
+    john --show zip.hashs 2>/dev/null | grep "flag.txt" | awk -F ":" '{print $2}'
+else
+    echo $result
+fi
+```
+
+## main.rs
+
+main.rs：这是一个 Rust 程序，用于解压缩 archive.zip 文件。它首先读取 archive.zip 文件，然后尝试使用密码进行解压缩。如果密码不正确，它会调用 get_password 函数来获取密码。该函数会根据压缩文件中的注释（comment）中的数字，构造一个正则表达式，然后调用 crack.sh 脚本来进行密码破解。如果密码正确，它会将解压缩后的文件重新写回 archive.zip 文件，然后继续尝试解压缩，直到成功或者不是压缩文件为止。
+
+```txt
+use std::fs::File;
+use std::io::{Read, Result, Write};
+use zip::ZipArchive;
+use std::process::Command;
+
+fn get_password(except_number: &u8) -> String {
+    let regular_expression: String;
+    if *except_number == 9 {
+        regular_expression = String::from("zjut[0-8]{6}(AA|BB)");
+    } else if *except_number == 0 {
+        regular_expression = String::from("zjut[1-9]{6}(AA|BB)");
+    } else {
+        regular_expression = format!("zjut[0-{}{}-9]{{6}}(AA|BB)", except_number - 1, except_number + 1);
+    }
+    let output = Command::new("bash")
+        .arg("crack.sh")
+        .arg(&regular_expression)
+        .output();
+    let output = output.unwrap();
+    let password = String::from_utf8(output.stdout).unwrap().trim().to_string();
+    password
+}
+
+fn main() -> Result<()> {
+    loop {
+        let file: File = File::open("archive.zip")?;
+        let mut archive = ZipArchive::new(file)?;
+        let comment = archive.comment();
+        let except_number = comment.last();
+        if except_number.is_none() {
+            // 读取文件
+            let mut archive_file = archive.by_index(0).unwrap();
+            let mut buffer = Vec::new();
+            archive_file.read_to_end(&mut buffer)?;
+            // 打印结果
+            let flag = String::from_utf8(buffer).unwrap();
+            println!("{}", flag);
+            break; // Exit the loop if it's not a zip archive
+        }
+        let except_number = except_number.unwrap() - b'0';
+        let password = get_password(&except_number);
+        let archive_file = archive.by_index_decrypt(0, password.as_bytes());
+        if archive_file.is_err() {
+            drop(archive_file);
+            // 读取文件
+            let mut archive_file = archive.by_index(0).unwrap();
+            let mut buffer = Vec::new();
+            archive_file.read_to_end(&mut buffer)?;
+            // 打印结果
+            let flag = String::from_utf8(buffer).unwrap();
+            println!("{}", flag);
+            break; // Exit the loop if it's not a zip archive
+        }
+        let archive_file = archive_file.unwrap();
+        let mut buffer = Vec::new();
+        archive_file.unwrap().read_to_end(&mut buffer)?;
+        let mut file = File::create("archive.zip")?;
+        file.write_all(&buffer)?;
+    }
+    
+    Ok(())
+}
+```
+
+## 运行
+
+在终端中进入到包含 main.rs 文件的目录中，然后使用以下命令来编译和运行 Rust 代码
+
+```txt
+cargo run
+```
+
+## 补充(安装cargo)
+
+```txt
+sudo apt update
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+rustc --version
+cargo --version
+```
+
+![](https://s21.ax1x.com/2024/04/06/pFqa4w8.png)

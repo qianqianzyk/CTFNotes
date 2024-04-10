@@ -159,3 +159,69 @@ calc.php? num=print_r(scandir('/'));
 ? num=print_r(file_get_contents(chr(47).chr(102).chr(49).chr(97).chr(103).chr(103))); 
 ```
 7. 得到flag
+
+# [BJDCTF2020]Easy MD5 1
+
+1. 使用burp发现在响应头这边找到了select * from 'admin' where password=md5($pass,true)
+2. 这里面password就是我们用户框中输入得东西。如果通过md5之后返回字符串是'or 1的话，形成一个永真条件，
+
+   select * from 'admin' where password='  'or  '6...'
+3. 可以用ffifdyop绕过，绕过原理是：
+
+   ffifdyop 这个字符串被 md5 哈希了之后会变成 276f722736c95d99e921722cf9ed621c，这个字符串前几位刚好是 ' or '6
+
+   而 Mysql 刚好又会把 hex 转成 ascii 解释，因此拼接之后的形式是 select * from 'admin' where password='' or '6xxxxx'，等价于 or 一个永真式，因此相当于万能密码，可以绕过md5()函数。
+4.  查看源码，我们发现有一个弱类型比较，也可以数组绕过
+```php
+<!--
+$a = $GET['a'];
+$b = $_GET['b'];
+
+if($a != $b && md5($a) == md5($b)){
+    // wow, glzjin wants a girl friend.
+--> 
+```
+5. 得到
+```php
+<?php
+error_reporting(0);
+include "flag.php";
+
+highlight_file(__FILE__);
+
+if($_POST['param1']!==$_POST['param2']&&md5($_POST['param1'])===md5($_POST['param2'])){
+    echo $flag;
+} 
+```
+6. POST方式，传param1和param2两个参数，这两个参数还不能相等，但是md5转换后的值还要相等（0e开头）
+
+   典型的md5碰撞嘛，这个是弱比较，所以可以用md5值为0e开头的来撞。这里提供一些md5以后是0e开头的值：
+
+   QNKCDZO
+
+   0e830400451993494058024219903391
+
+   s878926199a
+
+   0e545993274517709034328855841020
+
+   s155964671a
+
+   0e342768416822451524974117254469
+
+   s214587387a
+
+   0e848240448830537924465865611904
+
+   s214587387a
+
+   0e848240448830537924465865611904
+
+   s878926199a
+
+   0e545993274517709034328855841020
+
+   s1091221200a
+
+   0e940624217856561557816327384675
+7. 在这里我们就用md5无法处理数组，然后都返回null，null=null然后就绕过了这个。

